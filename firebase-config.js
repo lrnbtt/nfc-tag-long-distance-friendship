@@ -1,6 +1,6 @@
 // The only file you edit on GitHub. Used by both the page and the service worker.
 self.GHOST = {
-  api: 'https://script.google.com/macros/s/AKfycbzX6PEtXfoShNHmBDP3C8vdlzWG1bVEm2uefiwkueBm7h00nvdz9tYYbERzdoXl79ux/exec',
+  api: 'https://script.google.com/macros/s/AKfycbwun1mMRDk5Hby5_PkzmYzUZYk50mQ6q2u_-yCZSG2Z41tYA7flRphP1N-ZtgJ7cXxi/exec',
   vapidKey: 'BOO12LDI6JyBAuCSMXKS718oUu6-RRnqo70kJ8Wi6nwjsUnFS6XHerORrAPJrPeeiiQ2VB5bvkdT2wl9A3j-XBw',
   firebase: {
   apiKey: "AIzaSyA5_7UGXw42jZklnKeH4eS8McpI9AX30vE",
