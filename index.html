@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14132b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Thinking of you</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { background: #14132b; color: #ece9ff; font-family: system-ui, sans-serif; }
+  section { display: none; height: 100%; flex-direction: column; }
+  section.on { display: flex; }
+  #mood { justify-content: center; gap: 1.2rem; padding: 1.5rem; max-width: 28rem; margin-inline: auto; }
+  h1 { font-size: 1.4rem; font-weight: 500; margin: 0; }
+  .grid { display: grid; gap: .75rem; }
+  button { display: flex; align-items: center; gap: .9rem; font: inherit; font-size: 1.15rem; color: inherit;
+           background: #1f1d42; border: 2px solid var(--c); border-radius: 1rem; padding: 1rem 1.2rem;
+           text-align: left; cursor: pointer; }
+  button span { font-size: 1.6rem; }
+  button:active, button.sent { background: var(--c); color: #14132b; }
+  button:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .small { font-size: 1rem; padding: .7rem 1rem; }
+  #msg { min-height: 1.5rem; margin: 0; color: #b9b4e6; }
+  a { color: #b9b4e6; }
+  canvas { flex: 1; width: 100%; min-height: 0; }
+  #stats { padding: 1rem 1.5rem 1.5rem; line-height: 1.6; }
+  #stats p { margin: 0; }
+</style>
+<script src="firebase-config.js"></script>
+</head>
+<body>
+<section id="mood">
+  <h1 id="hi">How does it feel today?</h1>
+  <div class="grid" id="moods">
+    <button data-m="peace" style="--c:#7bd389"><span>🌿</span>Peace</button>
+    <button data-m="missing" style="--c:#c9d3e6"><span>🌙</span>Missing you</button>
+    <button data-m="happy" style="--c:#f6c453"><span>☀️</span>Happy</button>
+    <button data-m="energy" style="--c:#5aa9ff"><span>⚡</span>Need energy</button>
+    <button data-m="chaos" style="--c:#ff6a4d"><span>🔥</span>Chaos</button>
+  </div>
+  <p id="msg" role="status"></p>
+  <button id="buzz" class="small" style="--c:#b9b4e6" hidden>Turn on buzzes</button>
+  <button id="install" class="small" style="--c:#b9b4e6" hidden>Add to home screen</button>
+  <a href="#sky">See our sky</a>
+</section>
+<section id="sky">
+  <canvas id="cv"></canvas>
+  <div id="stats"><p id="s1"></p><p id="s2"></p><p id="s3"></p><p><a href="#">Back</a></p></div>
+</section>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+  import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
+
+  const G = self.GHOST;
+  const $ = id => document.getElementById(id);
+  const COL = { peace: '#7bd389', missing: '#c9d3e6', happy: '#f6c453', energy: '#5aa9ff', chaos: '#ff6a4d' };
+  const NAME = { peace: 'Peace', missing: 'Missing you', happy: 'Happy', energy: 'Need energy', chaos: 'Chaos' };
+  const store = {
+    get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
+  };
+
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('t')) {
+    store.set('t', qs.get('t'));
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+  const token = store.get('t');
+  let state = { name: '', events: [] };
+  let messaging = null;
+  const post = body => fetch(G.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                      body: JSON.stringify(body) }).then(r => r.json());
+
+  function show() {
+    const sky = location.hash === '#sky';
+    $('mood').classList.toggle('on', !sky);
+    $('sky').classList.toggle('on', sky);
+    if (sky) drawSky();
+  }
+  addEventListener('hashchange', show);
+  addEventListener('resize', () => location.hash === '#sky' && drawSky());
+
+  const moodButtons = [...document.querySelectorAll('#moods button')];
+
+  function loadState() {
+    return fetch(G.api + '?t=' + encodeURIComponent(token)).then(r => r.json()).then(s => {
+      if (s.error) { $('hi').textContent = 'This charm is not recognised.'; return; }
+      state = s;
+      $('hi').textContent = 'Hi ' + s.name + ', how does it feel today?';
+      if (location.hash === '#sky') drawSky();
+    }).catch(() => { $('msg').textContent = "Couldn't reach the server. Check your connection."; });
+  }
+
+  moodButtons.forEach(b => b.addEventListener('click', () => {
+    moodButtons.forEach(x => (x.disabled = true));
+    post({ t: token, mood: b.dataset.m }).then(j => {
+      if (!j.ok) throw 0;
+      state.events.push({ n: state.events.length + 1, ts: Date.now(), sender: state.name, mood: b.dataset.m });
+      b.classList.add('sent');
+      navigator.vibrate && navigator.vibrate(30);
+      $('msg').textContent = 'Sent ' + b.firstChild.textContent;
+      setTimeout(() => { b.classList.remove('sent'); moodButtons.forEach(x => (x.disabled = false)); }, 2500);
+    }).catch(() => {
+      $('msg').textContent = "That didn't send. Check your connection and try again.";
+      moodButtons.forEach(x => (x.disabled = false));
+    });
+  }));
+
+  // ---- buzzes (push notifications) ----
+  async function registerDevice() {
+    const reg = await navigator.serviceWorker.ready;
+    const dt = await getToken(messaging, { vapidKey: G.vapidKey, serviceWorkerRegistration: reg });
+    if (dt && dt !== store.get('dt')) {
+      const j = await post({ t: token, action: 'register', device: dt });
+      if (j.ok) store.set('dt', dt);
+    }
+  }
+  $('buzz').addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      try { await registerDevice(); $('buzz').hidden = true; $('msg').textContent = 'Buzzes are on.'; }
+      catch { $('msg').textContent = "Couldn't turn on buzzes. Please try again."; }
+    } else {
+      $('msg').textContent = 'Buzzes are off. You can turn them on in your phone settings.';
+    }
+  });
+
+  let installEvt = null;
+  addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('install').hidden = false; });
+  $('install').addEventListener('click', () => { installEvt && installEvt.prompt(); $('install').hidden = true; });
+
+  // ---- sky ----
+  const fr = x => x - Math.floor(x);
+  function ago(ms) {
+    const m = Math.round((Date.now() - ms) / 6e4);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    const h = Math.round(m / 60);
+    return h < 24 ? h + ' hours ago' : Math.round(h / 24) + ' days ago';
+  }
+  function drawSky() {
+    const cv = $('cv'), ctx = cv.getContext('2d');
+    const w = cv.clientWidth, h = cv.clientHeight, d = devicePixelRatio || 1;
+    cv.width = w * d; cv.height = h * d; ctx.scale(d, d);
+    const ev = state.events;
+    ev.forEach(s => {
+      const x = fr(Math.sin(s.n * 12.9898) * 43758.5453) * w;
+      const y = fr(Math.sin(s.n * 78.233) * 12543.12) * h;
+      const r = 1.5 + fr(Math.sin(s.n * 39.346) * 9871.3) * 2.5;
+      ctx.shadowColor = ctx.fillStyle = COL[s.mood] || '#fff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    });
+    if (!ev.length) {
+      $('s1').textContent = 'No stars yet. Tap the charm to make the first one.';
+      $('s2').textContent = ''; $('s3').textContent = ''; return;
+    }
+    const last = ev[ev.length - 1];
+    $('s1').textContent = 'Thoughts shared: ' + ev.length;
+    $('s2').textContent = 'Days together: ' + Math.max(1, Math.round((Date.now() - ev[0].ts) / 864e5));
+    $('s3').textContent = 'Last thought: ' + NAME[last.mood] + ' · ' + ago(last.ts);
+  }
+
+  // ---- start ----
+  show();
+  (async () => {
+    if ('serviceWorker' in navigator) await navigator.serviceWorker.register('sw.js');
+    if (!token) {
+      $('hi').textContent = 'Tap your charm to link this phone.';
+      moodButtons.forEach(b => (b.disabled = true));
+      return;
+    }
+    loadState();
+    try {
+      if (!(await isSupported())) return;
+      messaging = getMessaging(initializeApp(G.firebase));
+      onMessage(messaging, p => {            // a buzz arrives while the app is open
+        $('msg').textContent = (p.data && p.data.body) || '';
+        navigator.vibrate && navigator.vibrate([80, 60, 140]);
+        loadState();
+      });
+      if (Notification.permission === 'granted') registerDevice().catch(() => {});
+      else if (Notification.permission === 'default') $('buzz').hidden = false;
+    } catch {}
+  })();
+</script>
+</body></html>
