@@ -1,86 +1,323 @@
-// Backend: Google Sheet + Firebase Cloud Messaging. Paste this over Code.gs.
-// Script property needed: SERVICE_ACCOUNT = the full contents of your Firebase service account JSON.
-const MOODS = {
-  peace: '🌿 Peace', missing: '🌙 Missing you', happy: '☀️ Happy',
-  energy: '⚡ Need energy', chaos: '🔥 Chaos'
-};
-const sheet_ = n => SpreadsheetApp.getActive().getSheetByName(n);
-const json_ = o => ContentService.createTextOutput(JSON.stringify(o))
-  .setMimeType(ContentService.MimeType.JSON);
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14132b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Thinking of you</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { background: #14132b; color: #ece9ff; font-family: system-ui, sans-serif; }
+  section { display: none; height: 100%; flex-direction: column; }
+  section.on { display: flex; }
+  #mood { justify-content: center; gap: 1.2rem; padding: 1.5rem; max-width: 28rem; margin-inline: auto; }
+  h1 { font-size: 1.4rem; font-weight: 500; margin: 0; }
+  .grid { display: grid; gap: .75rem; }
+  button { display: flex; align-items: center; gap: .9rem; font: inherit; font-size: 1.15rem; color: inherit;
+           background: #1f1d42; border: 2px solid var(--c); border-radius: 1rem; padding: 1rem 1.2rem;
+           text-align: left; cursor: pointer; }
+  button span { font-size: 1.6rem; }
+  button:active, button.sent { background: var(--c); color: #14132b; }
+  button:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .small { font-size: 1rem; padding: .7rem 1rem; }
+  #msg { min-height: 1.5rem; margin: 0; color: #b9b4e6; }
+  a { color: #b9b4e6; }
+  canvas { flex: 1; width: 100%; min-height: 0; }
+  #stats { padding: 1rem 1.5rem 1.5rem; line-height: 1.6; }
+  #stats p { margin: 0; }
 
-// People tab columns: token | name | group | push | birthday   (push fills itself in; birthday is MM-DD, e.g. 03-15, optional)
-const bd_ = v => v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'MM-dd') : String(v || '').trim();
-function people_() {
-  return sheet_('People').getDataRange().getValues().slice(1)
-    .map((r, i) => ({ row: i + 2, token: String(r[0]), name: r[1], group: String(r[2]), push: String(r[3] || ''), birthday: bd_(r[4]) }))
-    .filter(p => p.token);
-}
-const who_ = token => people_().find(p => p.token === String(token));
+  #wrap { position: relative; flex: 1; min-height: 0; }
+  #wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #ghost { position: absolute; left: 50%; bottom: 6%; width: 9rem; transform: translateX(-50%); overflow: visible; }
+  #ghost text { text-anchor: middle; }
+  .eyes-shut, .eyes-happy, .props text { display: none; }
+  .m-peace .eyes-open, .m-happy .eyes-open { display: none; }
+  .m-peace .eyes-shut, .m-happy .eyes-happy { display: inline; }
+  .m-peace .p-peace, .m-happy .p-happy, .m-missing .p-missing, .m-energy .p-energy, .m-chaos .p-chaos { display: inline; }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  @keyframes sway { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+  @keyframes zoom { 0%, 100% { transform: translateX(-60px); } 50% { transform: translateX(60px); } }
+  @keyframes wob { 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+  @keyframes flick { 50% { opacity: .5; } }
+  #body { transform-box: fill-box; transform-origin: 50% 100%; animation: bob 4s ease-in-out infinite; }
+  .m-peace #body { animation-duration: 7s; }
+  .m-happy #body { animation: sway 1s ease-in-out infinite; }
+  .m-energy #body { animation: zoom .9s ease-in-out infinite; }
+  .m-chaos #body { animation: wob .25s linear infinite; }
+  .p-chaos { animation: flick .4s infinite; }
+  #notes p { color: #f6c453; }
+  @media (prefers-reduced-motion: reduce) { #body, .props text { animation: none !important; } }
+</style>
+<script src="firebase-config.js"></script>
+</head>
+<body>
+<section id="mood">
+  <h1 id="hi">How does it feel today?</h1>
+  <div class="grid" id="moods">
+    <button data-m="peace" style="--c:#7bd389"><span>🌿</span>Peace</button>
+    <button data-m="missing" style="--c:#c9d3e6"><span>🌙</span>Missing you</button>
+    <button data-m="happy" style="--c:#f6c453"><span>☀️</span>Happy</button>
+    <button data-m="energy" style="--c:#5aa9ff"><span>⚡</span>Need energy</button>
+    <button data-m="chaos" style="--c:#ff6a4d"><span>🔥</span>Chaos</button>
+  </div>
+  <p id="msg" role="status"></p>
+  <button id="buzz" class="small" style="--c:#b9b4e6" hidden>Turn on buzzes</button>
+  <button id="install" class="small" style="--c:#b9b4e6" hidden>Add to home screen</button>
+  <a href="#sky">See our sky</a>
+</section>
+<section id="sky">
+  <div id="wrap">
+    <canvas id="cv"></canvas>
+    <svg id="ghost" viewBox="0 0 120 150" role="img" aria-label="Our friendship ghost">
+      <g class="props">
+        <text class="p-peace" x="104" y="140" font-size="44">🌳</text>
+        <text class="p-peace" x="60" y="22" font-size="20">💤</text>
+        <text class="p-happy" x="106" y="40" font-size="20">✨</text>
+        <text class="p-happy" x="14" y="40" font-size="20">✨</text>
+        <text class="p-missing" x="60" y="18" font-size="24">🌠</text>
+        <text class="p-energy" x="10" y="80" font-size="22">⚡</text>
+        <text class="p-chaos" x="104" y="76" font-size="26">🔥</text>
+        <text class="p-chaos" x="16" y="120" font-size="22">🔥</text>
+      </g>
+      <g id="body">
+        <path d="M20 70 C20 28 100 28 100 70 L100 128 L88 116 L76 130 L64 116 L52 130 L40 116 L28 130 L20 118 Z" fill="#ece9ff"/>
+        <g class="eyes-open"><circle cx="45" cy="68" r="6" fill="#14132b"/><circle cx="75" cy="68" r="6" fill="#14132b"/></g>
+        <g class="eyes-shut"><path d="M38 68 q7 6 14 0 M68 68 q7 6 14 0" stroke="#14132b" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <g class="eyes-happy"><path d="M38 70 q7 -8 14 0 M68 70 q7 -8 14 0" stroke="#14132b" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <ellipse cx="36" cy="82" rx="6" ry="4" fill="#ff9db8" opacity=".6"/><ellipse cx="84" cy="82" rx="6" ry="4" fill="#ff9db8" opacity=".6"/>
+        <path d="M53 84 q7 6 14 0" stroke="#14132b" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <text id="acc" x="60" y="42" font-size="30"></text>
+      </g>
+      <text id="pet" x="14" y="140" font-size="26"></text>
+    </svg>
+  </div>
+  <div id="stats"><p id="s1"></p><p id="s2"></p><p id="s3"></p><p id="s4"></p><div id="notes"></div><p><a href="#">Back</a></p></div>
+</section>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+  import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
 
-// Events tab columns: ts | group | sender | mood
-function doGet(e) {
-  const me = who_(e.parameter.t);
-  if (!me) return json_({ error: 'unknown charm' });
-  const events = sheet_('Events').getDataRange().getValues().slice(1)
-    .filter(r => String(r[1]) === me.group)
-    .map((r, i) => ({ n: i + 1, ts: new Date(r[0]).getTime(), sender: r[2], mood: r[3] }));
-  const people = people_().filter(p => p.group === me.group).map(p => ({ name: p.name, birthday: p.birthday }));
-  return json_({ name: me.name, events, people });
-}
+  const G = self.GHOST;
+  const $ = id => document.getElementById(id);
+  const COL = { peace: '#7bd389', missing: '#c9d3e6', happy: '#f6c453', energy: '#5aa9ff', chaos: '#ff6a4d' };
+  const NAME = { peace: 'Peace', missing: 'Missing you', happy: 'Happy', energy: 'Need energy', chaos: 'Chaos' };
+  const store = {
+    get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
+  };
 
-function doPost(e) {
-  let b;
-  try { b = JSON.parse(e.postData.contents); } catch (err) { return json_({ error: 'bad request' }); }
-  const me = who_(b.t);
-  if (!me) return json_({ error: 'bad request' });
-
-  if (b.action === 'register' && b.device) {            // a phone allowed buzzes
-    sheet_('People').getRange(me.row, 4).setValue(String(b.device));
-    return json_({ ok: true });
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('t')) {
+    store.set('t', qs.get('t'));
+    history.replaceState(null, '', location.pathname + location.hash);
   }
-  if (!MOODS[b.mood]) return json_({ error: 'bad request' });
+  const token = store.get('t');
+  let state = { name: '', events: [] };
+  let messaging = null;
+  const post = body => fetch(G.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                      body: JSON.stringify(body) }).then(r => r.json());
 
-  sheet_('Events').appendRow([new Date(), me.group, me.name, b.mood]);
-  people_().filter(p => p.group === me.group && p.token !== me.token && p.push)
-    .forEach(p => push_(p, 'Thinking of you', me.name + ' thought of you ' + MOODS[b.mood]));
-  return json_({ ok: true });
-}
+  function show() {
+    const sky = location.hash === '#sky';
+    $('mood').classList.toggle('on', !sky);
+    $('sky').classList.toggle('on', sky);
+    if (sky) drawSky();
+  }
+  addEventListener('hashchange', show);
+  addEventListener('resize', () => location.hash === '#sky' && drawSky());
 
-function push_(p, title, body) {
-  const proj = JSON.parse(PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT')).project_id;
-  const r = UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/' + proj + '/messages:send', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { Authorization: 'Bearer ' + accessToken_() },
-    payload: JSON.stringify({ message: {
-      token: p.push,
-      data: { title: title, body: body },
-      webpush: { headers: { Urgency: 'high', TTL: '86400' } }
-    } }),
-    muteHttpExceptions: true
-  });
-  if (r.getResponseCode() === 404) sheet_('People').getRange(p.row, 4).clear(); // device no longer exists
-}
+  const moodButtons = [...document.querySelectorAll('#moods button')];
 
-// Signs a service-account login with the private key to get a short-lived Google access token.
-function accessToken_() {
-  const cache = CacheService.getScriptCache();
-  const hit = cache.get('fcm');
-  if (hit) return hit;
-  const sa = JSON.parse(PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT'));
-  const now = Math.floor(Date.now() / 1000);
-  const b64 = x => Utilities.base64EncodeWebSafe(x).replace(/=+$/, '');
-  const head = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = b64(JSON.stringify({
-    iss: sa.client_email, scope: 'https://www.googleapis.com/auth/firebase.messaging',
-    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600
+  function loadState() {
+    return fetch(G.api + '?t=' + encodeURIComponent(token)).then(r => r.json()).then(s => {
+      if (s.error) { $('hi').textContent = 'This charm is not recognised.'; return; }
+      state = s;
+      $('hi').textContent = 'Hi ' + s.name + ', how does it feel today?';
+      if (location.hash === '#sky') drawSky();
+    }).catch(() => { $('msg').textContent = "Couldn't reach the server. Check your connection."; });
+  }
+
+  moodButtons.forEach(b => b.addEventListener('click', () => {
+    moodButtons.forEach(x => (x.disabled = true));
+    post({ t: token, mood: b.dataset.m }).then(j => {
+      if (!j.ok) throw 0;
+      state.events.push({ n: state.events.length + 1, ts: Date.now(), sender: state.name, mood: b.dataset.m });
+      b.classList.add('sent');
+      navigator.vibrate && navigator.vibrate(30);
+      $('msg').textContent = 'Sent ' + b.firstChild.textContent + special();
+      setTimeout(() => { b.classList.remove('sent'); moodButtons.forEach(x => (x.disabled = false)); }, 2500);
+    }).catch(() => {
+      $('msg').textContent = "That didn't send. Check your connection and try again.";
+      moodButtons.forEach(x => (x.disabled = false));
+    });
   }));
-  const sig = b64(Utilities.computeRsaSha256Signature(head + '.' + claim, sa.private_key));
-  const res = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-    method: 'post',
-    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: head + '.' + claim + '.' + sig }
+
+  // ---- buzzes (push notifications) ----
+  async function registerDevice() {
+    const reg = await navigator.serviceWorker.ready;
+    const dt = await getToken(messaging, { vapidKey: G.vapidKey, serviceWorkerRegistration: reg });
+    if (dt && dt !== store.get('dt')) {
+      const j = await post({ t: token, action: 'register', device: dt });
+      if (j.ok) store.set('dt', dt);
+    }
+  }
+  $('buzz').addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      try { await registerDevice(); $('buzz').hidden = true; $('msg').textContent = 'Buzzes are on.'; }
+      catch { $('msg').textContent = "Couldn't turn on buzzes. Please try again."; }
+    } else {
+      $('msg').textContent = 'Buzzes are off. You can turn them on in your phone settings.';
+    }
   });
-  const token = JSON.parse(res.getContentText()).access_token;
-  cache.put('fcm', token, 3000);
-  return token;
-}
+
+  let installEvt = null;
+  addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('install').hidden = false; });
+  $('install').addEventListener('click', () => { installEvt && installEvt.prompt(); $('install').hidden = true; });
+
+  // ---- sky, ghost, seasons and hidden magic ----
+  // [name, emoji, days needed, thoughts needed]. A season never goes back down.
+  const SEASONS = [['Spring', '🌱', 0, 0], ['Summer', '🌼', 30, 30], ['Autumn', '🍂', 180, 150], ['Winter', '❄️', 365, 400]];
+  const PETS = ['', '🦋', '🐈', '🦉'];
+  const fr = x => x - Math.floor(x);
+  const rnd = (n, k) => fr(Math.sin(n * k) * 43758.5453);
+  const mdOf = d => String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  function ago(ms) {
+    const m = Math.round((Date.now() - ms) / 6e4);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    const h = Math.round(m / 60);
+    return h < 24 ? h + ' hours ago' : Math.round(h / 24) + ' days ago';
+  }
+  // Stars from different people sent within 10 minutes of each other
+  function twinSet(ev) {
+    const t = new Set();
+    for (let i = 1; i < ev.length; i++)
+      for (let j = i - 1; j >= 0 && ev[i].ts - ev[j].ts <= 6e5; j--)
+        if (ev[j].sender !== ev[i].sender) { t.add(ev[i].n); t.add(ev[j].n); }
+    return t;
+  }
+  // Extra line shown right after you send a thought
+  function special() {
+    const ev = state.events, n = ev.length, me = ev[n - 1];
+    let s = '';
+    if (ev.some(e => e.sender !== me.sender && me.ts - e.ts <= 6e5)) s += ' ✨ Twin Star!';
+    if (n === 100) s += ' 👑 100th thought: your ghost got a crown!';
+    if (n === 1000) s += ' 🌌 1000th thought: a new galaxy!';
+    return s;
+  }
+  function drawSky() {
+    const cv = $('cv'), ctx = cv.getContext('2d');
+    const w = cv.clientWidth, h = cv.clientHeight, d = devicePixelRatio || 1;
+    cv.width = w * d; cv.height = h * d; ctx.scale(d, d);
+    const ev = state.events, n = ev.length, last = ev[n - 1];
+    const days = n ? Math.max(1, Math.round((Date.now() - ev[0].ts) / 864e5)) : 0;
+    let si = 0;
+    SEASONS.forEach((s, i) => { if (days >= s[2] && n >= s[3]) si = i; });
+
+    // the shared ghost
+    $('ghost').setAttribute('class', last ? 'm-' + last.mood : '');
+    $('acc').textContent = n >= 100 ? '👑' : n >= 25 ? '🎩' : '';
+    $('pet').textContent = PETS[si];
+
+    // winter: nebulae
+    if (si >= 3) {
+      [['#8a5cff', .2, .3], ['#2fc4b2', .7, .5], ['#ff6aa0', .45, .75]].forEach(([c, x, y]) => {
+        const g = ctx.createRadialGradient(x * w, y * h, 0, x * w, y * h, w * .4);
+        g.addColorStop(0, c + '33'); g.addColorStop(1, c + '00');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      });
+    }
+    // 1000th thought: a galaxy
+    if (n >= 1000) {
+      ctx.fillStyle = 'rgba(236,233,255,.35)';
+      for (let i = 0; i < 400; i++) for (let k = 0; k < 2; k++) {
+        const a = i * .15 + k * Math.PI, r = 4 + i * .35;
+        ctx.fillRect(w * .5 + Math.cos(a) * r * 1.2, h * .35 + Math.sin(a) * r * .6, 1.5, 1.5);
+      }
+    }
+    const pos = ev.map(s => ({ x: rnd(s.n, 12.9898) * w, y: rnd(s.n, 78.233) * h * .85, r: 1.5 + rnd(s.n, 39.346) * 2.5, s }));
+    // summer onward: constellations
+    if (si >= 1) {
+      ctx.strokeStyle = 'rgba(236,233,255,.18)'; ctx.lineWidth = 1; ctx.beginPath();
+      pos.forEach((p, i) => { if (i % 6 !== 5 && pos[i + 1]) { ctx.moveTo(p.x, p.y); ctx.lineTo(pos[i + 1].x, pos[i + 1].y); } });
+      ctx.stroke();
+    }
+    // stars, twin rings, and rare sparkles every 50th star (autumn onward)
+    const tw = twinSet(ev);
+    pos.forEach(p => {
+      ctx.shadowColor = ctx.fillStyle = COL[p.s.mood] || '#fff'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+      ctx.shadowBlur = 0;
+      if (tw.has(p.s.n)) { ctx.strokeStyle = '#f6c453'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 4, 0, 7); ctx.stroke(); }
+      if (si >= 2 && p.s.n % 50 === 0) {
+        ctx.strokeStyle = '#fff6cf'; ctx.lineWidth = 1.5; ctx.beginPath();
+        ctx.moveTo(p.x - 9, p.y); ctx.lineTo(p.x + 9, p.y); ctx.moveTo(p.x, p.y - 9); ctx.lineTo(p.x, p.y + 9); ctx.stroke();
+      }
+    });
+    // winter: shooting stars and moons
+    if (si >= 3) {
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5; ctx.beginPath();
+      [[.15, .15], [.7, .08], [.85, .4]].forEach(([x, y]) => { ctx.moveTo(x * w, y * h); ctx.lineTo(x * w + 50, y * h + 22); });
+      ctx.stroke();
+      ctx.font = '22px system-ui'; ctx.fillText('🌙', w * .8, h * .2); ctx.fillText('🌙', w * .1, h * .5);
+    }
+    // summer onward: flowers along the bottom
+    if (si >= 1) { ctx.font = '18px system-ui'; for (let i = 0; i < 8; i++) ctx.fillText('🌼', (i + .3) * w / 8, h - 4); }
+
+    // birthday constellation
+    const now = new Date(), md = mdOf(now);
+    const bd = (state.people || []).filter(p => p.birthday === md).map(p => p.name);
+    if (bd.length) {
+      const P = [[.12, .1], [.2, .06], [.3, .1], [.38, .07], [.45, .15], [.38, .22], [.3, .17]].map(([x, y]) => [x * w, y * h]);
+      ctx.strokeStyle = 'rgba(246,196,83,.8)'; ctx.lineWidth = 1.5; ctx.beginPath();
+      P.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+      ctx.stroke();
+      ctx.fillStyle = '#f6c453';
+      P.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 7); ctx.fill(); });
+    }
+
+    // text
+    const notes = [];
+    if (bd.length) notes.push('🎂 Birthday constellation for ' + bd.join(' and '));
+    if (n) {
+      const f = new Date(ev[0].ts), yrs = now.getFullYear() - f.getFullYear();
+      if (mdOf(f) === md && yrs > 0) notes.push('🌟 Friendship Day: ' + yrs + ' year' + (yrs > 1 ? 's' : '') + ' since your first tap');
+    }
+    if (tw.size) notes.push('✨ ' + tw.size + ' twin stars in your sky');
+    $('s1').textContent = 'Season: ' + SEASONS[si][1] + ' ' + SEASONS[si][0];
+    $('s2').textContent = n ? 'Ghost age: ' + days + ' days' + (days >= 365 ? ' · ' + Math.floor(days / 365) + ' year(s) together' : '')
+                            : 'No stars yet. Tap the charm to make the first one.';
+    $('s3').textContent = n ? 'Thoughts shared: ' + n : '';
+    $('s4').textContent = n ? 'Last thought: ' + NAME[last.mood] + ' · ' + ago(last.ts) : '';
+    $('notes').replaceChildren(...notes.map(t => { const p = document.createElement('p'); p.textContent = t; return p; }));
+  }
+
+  // ---- start ----
+  show();
+  (async () => {
+    if ('serviceWorker' in navigator) await navigator.serviceWorker.register('sw.js');
+    if (!token) {
+      $('hi').textContent = 'Tap your charm to link this phone.';
+      moodButtons.forEach(b => (b.disabled = true));
+      return;
+    }
+    loadState();
+    try {
+      if (!(await isSupported())) return;
+      messaging = getMessaging(initializeApp(G.firebase));
+      onMessage(messaging, p => {            // a buzz arrives while the app is open
+        $('msg').textContent = (p.data && p.data.body) || '';
+        navigator.vibrate && navigator.vibrate([80, 60, 140]);
+        loadState();
+      });
+      if (Notification.permission === 'granted') registerDevice().catch(() => {});
+      else if (Notification.permission === 'default') $('buzz').hidden = false;
+    } catch {}
+  })();
+</script>
+</body></html>
