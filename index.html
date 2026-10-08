@@ -32,25 +32,43 @@
 
   #wrap { position: relative; flex: 1; min-height: 0; }
   #wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #ghost { position: absolute; left: 50%; bottom: 6%; width: 9rem; transform: translateX(-50%); overflow: visible; }
+  #ghost { position: absolute; left: 50%; bottom: 6%; width: 9rem; transform: translateX(-50%); overflow: visible; pointer-events: none; }
+  #body { pointer-events: auto; cursor: pointer; }
   #ghost text { text-anchor: middle; }
   .eyes-shut, .eyes-happy, .props text { display: none; }
-  .m-peace .eyes-open, .m-happy .eyes-open { display: none; }
-  .m-peace .eyes-shut, .m-happy .eyes-happy { display: inline; }
-  .m-peace .p-peace, .m-happy .p-happy, .m-missing .p-missing, .m-energy .p-energy, .m-chaos .p-chaos { display: inline; }
+  .m-peace .eyes-open, .m-happy .eyes-open, .m-wait .eyes-open { display: none; }
+  .m-peace .eyes-shut, .m-wait .eyes-shut, .m-happy .eyes-happy { display: inline; }
+  .m-peace .p-peace, .m-happy .p-happy, .m-missing .p-missing, .m-energy .p-energy, .m-chaos .p-chaos, .m-wait .p-wait { display: inline; }
   @keyframes bob { 50% { transform: translateY(-6px); } }
   @keyframes sway { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
   @keyframes zoom { 0%, 100% { transform: translateX(-60px); } 50% { transform: translateX(60px); } }
   @keyframes wob { 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
   @keyframes flick { 50% { opacity: .5; } }
+  @keyframes flap { 50% { transform: scaleX(.86); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes hide { 0%, 100% { transform: scale(1); } 30%, 70% { transform: scale(.08); } }
+  @keyframes sneeze { 40% { transform: translateY(6px) scale(1.06, .92); } 60% { transform: translateX(14px) rotate(6deg); } }
+  @keyframes jump { 30% { transform: translateY(-18px); } 60% { transform: translateY(0); } 80% { transform: translateY(-8px); } }
   #body { transform-box: fill-box; transform-origin: 50% 100%; animation: bob 4s ease-in-out infinite; }
+  #wings { transform-box: fill-box; transform-origin: 50% 50%; animation: flap 2.5s ease-in-out infinite; }
+  #tapfx { transform-box: fill-box; transform-origin: 50% 70%; }
+  .fx-spin { animation: spin .8s ease-in-out; }
+  .fx-hide { animation: hide 1.2s ease-in-out; transform-origin: 50% 100% !important; }
+  .fx-sneeze { animation: sneeze .7s ease-out; }
+  .fx-confetti { animation: jump 1s ease-out; }
   .m-peace #body { animation-duration: 7s; }
+  .m-peace #wings { animation-duration: 6s; }
   .m-happy #body { animation: sway 1s ease-in-out infinite; }
+  .m-happy #wings { animation-duration: .6s; }
   .m-energy #body { animation: zoom .9s ease-in-out infinite; }
+  .m-energy #wings { animation-duration: .25s; }
   .m-chaos #body { animation: wob .25s linear infinite; }
+  .m-wait #body { animation-duration: 9s; }
+  .m-wait #wings { animation: none; transform: scaleX(.55); }
   .p-chaos { animation: flick .4s infinite; }
   #notes p { color: #f6c453; }
-  @media (prefers-reduced-motion: reduce) { #body, .props text { animation: none !important; } }
+  #cname { color: #f6c453; min-height: 1.6em; }
+  @media (prefers-reduced-motion: reduce) { #body, #wings, #tapfx, .props text { animation: none !important; } }
 </style>
 <script src="firebase-config.js"></script>
 </head>
@@ -72,30 +90,44 @@
 <section id="sky">
   <div id="wrap">
     <canvas id="cv"></canvas>
-    <svg id="ghost" viewBox="0 0 120 150" role="img" aria-label="Our friendship ghost">
+    <svg id="ghost" viewBox="0 0 120 150" role="img" aria-label="Our friendship mothman">
       <g class="props">
         <text class="p-peace" x="104" y="140" font-size="44">🌳</text>
-        <text class="p-peace" x="60" y="22" font-size="20">💤</text>
+        <text class="p-peace" x="98" y="30" font-size="20">💤</text>
+        <text class="p-wait" x="98" y="30" font-size="20">💤</text>
         <text class="p-happy" x="106" y="40" font-size="20">✨</text>
         <text class="p-happy" x="14" y="40" font-size="20">✨</text>
-        <text class="p-missing" x="60" y="18" font-size="24">🌠</text>
+        <text class="p-missing" x="98" y="26" font-size="24">🌠</text>
         <text class="p-energy" x="10" y="80" font-size="22">⚡</text>
         <text class="p-chaos" x="104" y="76" font-size="26">🔥</text>
         <text class="p-chaos" x="16" y="120" font-size="22">🔥</text>
       </g>
-      <g id="body">
-        <path d="M20 70 C20 28 100 28 100 70 L100 128 L88 116 L76 130 L64 116 L52 130 L40 116 L28 130 L20 118 Z" fill="#ece9ff"/>
-        <g class="eyes-open"><circle cx="45" cy="68" r="6" fill="#14132b"/><circle cx="75" cy="68" r="6" fill="#14132b"/></g>
-        <g class="eyes-shut"><path d="M38 68 q7 6 14 0 M68 68 q7 6 14 0" stroke="#14132b" stroke-width="3" fill="none" stroke-linecap="round"/></g>
-        <g class="eyes-happy"><path d="M38 70 q7 -8 14 0 M68 70 q7 -8 14 0" stroke="#14132b" stroke-width="3" fill="none" stroke-linecap="round"/></g>
-        <ellipse cx="36" cy="82" rx="6" ry="4" fill="#ff9db8" opacity=".6"/><ellipse cx="84" cy="82" rx="6" ry="4" fill="#ff9db8" opacity=".6"/>
-        <path d="M53 84 q7 6 14 0" stroke="#14132b" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <text id="acc" x="60" y="42" font-size="30"></text>
-      </g>
+      <g id="tapfx"><g id="body" role="button" tabindex="0" aria-label="Tap the mothman">
+        <g id="wings">
+          <path d="M58 62 C22 18 2 50 8 92 C12 114 40 110 58 98 Z" fill="#7a68b0"/>
+          <path d="M62 62 C98 18 118 50 112 92 C108 114 80 110 62 98 Z" fill="#7a68b0"/>
+          <circle cx="26" cy="76" r="8" fill="#f6c453"/><circle cx="26" cy="76" r="3.5" fill="#14132b"/>
+          <circle cx="94" cy="76" r="8" fill="#f6c453"/><circle cx="94" cy="76" r="3.5" fill="#14132b"/>
+        </g>
+        <path d="M52 36 Q40 10 28 14 M68 36 Q80 10 92 14" stroke="#cfc6e8" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="28" cy="14" r="3" fill="#cfc6e8"/><circle cx="92" cy="14" r="3" fill="#cfc6e8"/>
+        <ellipse cx="60" cy="96" rx="24" ry="30" fill="#cfc6e8"/>
+        <ellipse cx="60" cy="106" rx="13" ry="16" fill="#ece9ff"/>
+        <ellipse cx="50" cy="126" rx="8" ry="5" fill="#cfc6e8"/><ellipse cx="70" cy="126" rx="8" ry="5" fill="#cfc6e8"/>
+        <circle cx="60" cy="56" r="25" fill="#cfc6e8"/>
+        <g class="eyes-open"><circle cx="48" cy="56" r="9" fill="#ff5a64"/><circle cx="72" cy="56" r="9" fill="#ff5a64"/><circle cx="45" cy="53" r="3" fill="#fff"/><circle cx="69" cy="53" r="3" fill="#fff"/></g>
+        <g class="eyes-shut"><path d="M40 57 q8 7 16 0 M64 57 q8 7 16 0" stroke="#14132b" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <g class="eyes-happy"><path d="M40 59 q8 -9 16 0 M64 59 q8 -9 16 0" stroke="#14132b" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <ellipse cx="38" cy="68" rx="5" ry="3.5" fill="#ff9db8" opacity=".6"/><ellipse cx="82" cy="68" rx="5" ry="3.5" fill="#ff9db8" opacity=".6"/>
+        <path d="M55 68 q5 4 10 0" stroke="#14132b" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <g id="costume"></g>
+        <text id="acc" x="60" y="34" font-size="28"></text>
+      </g></g>
+      <text id="fx" x="60" y="12" font-size="22"></text>
       <text id="pet" x="14" y="140" font-size="26"></text>
     </svg>
   </div>
-  <div id="stats"><p id="s1"></p><p id="s2"></p><p id="s3"></p><p id="s4"></p><div id="notes"></div><p><a href="#">Back</a></p></div>
+  <div id="stats"><p id="cname"></p><p id="s1"></p><p id="s2"></p><p id="s3"></p><p id="s4"></p><div id="notes"></div><p><a href="#">Back</a></p></div>
 </section>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
@@ -206,7 +238,7 @@
     const ev = state.events, n = ev.length, me = ev[n - 1];
     let s = '';
     if (ev.some(e => e.sender !== me.sender && me.ts - e.ts <= 6e5)) s += ' ✨ Twin Star!';
-    if (n === 100) s += ' 👑 100th thought: your ghost got a crown!';
+    if (n === 100) s += ' 👑 100th thought: your mothman got a crown!';
     if (n === 1000) s += ' 🌌 1000th thought: a new galaxy!';
     return s;
   }
@@ -219,9 +251,14 @@
     let si = 0;
     SEASONS.forEach((s, i) => { if (days >= s[2] && n >= s[3]) si = i; });
 
-    // the shared ghost
-    $('ghost').setAttribute('class', last ? 'm-' + last.mood : '');
-    $('acc').textContent = n >= 100 ? '👑' : n >= 25 ? '🎩' : '';
+    // the shared mothman: mood, costume, accessories, and the sleepy "waiting" state
+    const now = new Date(), md = mdOf(now);
+    const bd = (state.people || []).filter(p => p.birthday === md).map(p => p.name);
+    const waiting = n > 0 && (Date.now() - last.ts) / 864e5 >= 3;
+    $('ghost').setAttribute('class', waiting ? 'm-wait' : last ? 'm-' + last.mood : '');
+    const cos = PREVIEW_COSTUME || costumeFor(now, bd.length > 0);
+    $('costume').innerHTML = COSTUMES[cos] || '';
+    $('acc').textContent = cos ? '' : n >= 100 ? '👑' : n >= 25 ? '🎩' : '';
     $('pet').textContent = PETS[si];
 
     // winter: nebulae
@@ -241,10 +278,17 @@
       }
     }
     const pos = ev.map(s => ({ x: rnd(s.n, 12.9898) * w, y: rnd(s.n, 78.233) * h * .85, r: 1.5 + rnd(s.n, 39.346) * 2.5, s }));
+    lastPos = pos;
     // summer onward: constellations
     if (si >= 1) {
       ctx.strokeStyle = 'rgba(236,233,255,.18)'; ctx.lineWidth = 1; ctx.beginPath();
       pos.forEach((p, i) => { if (i % 6 !== 5 && pos[i + 1]) { ctx.moveTo(p.x, p.y); ctx.lineTo(pos[i + 1].x, pos[i + 1].y); } });
+      ctx.stroke();
+    }
+    // the constellation you tapped glows gold
+    if (hl >= 0) {
+      ctx.strokeStyle = 'rgba(246,196,83,.85)'; ctx.lineWidth = 2; ctx.beginPath();
+      pos.slice(hl * 6, hl * 6 + 6).forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
       ctx.stroke();
     }
     // stars, twin rings, and rare sparkles every 50th star (autumn onward)
@@ -270,8 +314,6 @@
     if (si >= 1) { ctx.font = '18px system-ui'; for (let i = 0; i < 8; i++) ctx.fillText('🌼', (i + .3) * w / 8, h - 4); }
 
     // birthday constellation
-    const now = new Date(), md = mdOf(now);
-    const bd = (state.people || []).filter(p => p.birthday === md).map(p => p.name);
     if (bd.length) {
       const P = [[.12, .1], [.2, .06], [.3, .1], [.38, .07], [.45, .15], [.38, .22], [.3, .17]].map(([x, y]) => [x * w, y * h]);
       ctx.strokeStyle = 'rgba(246,196,83,.8)'; ctx.lineWidth = 1.5; ctx.beginPath();
@@ -281,6 +323,9 @@
       P.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 3, 0, 7); ctx.fill(); });
     }
 
+    // the sky dims gently while the mothman waits (nothing is lost)
+    if (waiting) { ctx.fillStyle = 'rgba(20,19,43,.4)'; ctx.fillRect(0, 0, w, h); }
+
     // text
     const notes = [];
     if (bd.length) notes.push('🎂 Birthday constellation for ' + bd.join(' and '));
@@ -289,13 +334,69 @@
       if (mdOf(f) === md && yrs > 0) notes.push('🌟 Friendship Day: ' + yrs + ' year' + (yrs > 1 ? 's' : '') + ' since your first tap');
     }
     if (tw.size) notes.push('✨ ' + tw.size + ' twin stars in your sky');
+    if (!$('cname').textContent) $('cname').textContent = 'Tap a star, or tap the mothman';
     $('s1').textContent = 'Season: ' + SEASONS[si][1] + ' ' + SEASONS[si][0];
-    $('s2').textContent = n ? 'Ghost age: ' + days + ' days' + (days >= 365 ? ' · ' + Math.floor(days / 365) + ' year(s) together' : '')
+    $('s2').textContent = n ? 'Mothman age: ' + days + ' days' + (days >= 365 ? ' · ' + Math.floor(days / 365) + ' year(s) together' : '')
                             : 'No stars yet. Tap the charm to make the first one.';
     $('s3').textContent = n ? 'Thoughts shared: ' + n : '';
-    $('s4').textContent = n ? 'Last thought: ' + NAME[last.mood] + ' · ' + ago(last.ts) : '';
+    $('s4').textContent = n ? 'Last thought: ' + NAME[last.mood] + ' · ' + ago(last.ts) + (waiting ? ' · Mothman is curled up, waiting 💤' : '') : '';
     $('notes').replaceChildren(...notes.map(t => { const p = document.createElement('p'); p.textContent = t; return p; }));
   }
+
+  // ---- costumes, constellation names, tapping ----
+  const PREVIEW_COSTUME = '';   // to preview, set to 'witch', 'santa', 'newyear', 'valentine' or 'party', then clear it again
+  const HAT = (path, fill) => '<path d="' + path + '" fill="' + fill + '"/>';
+  const COSTUMES = {
+    witch: HAT('M44 40 L60 6 L76 40 Z', '#3b2a63') + '<rect x="36" y="38" width="48" height="6" rx="3" fill="#3b2a63"/><rect x="47" y="30" width="26" height="4" fill="#f6a23c"/>',
+    santa: HAT('M44 40 Q58 -4 86 24 L80 40 Z', '#d8404c') + '<rect x="42" y="36" width="42" height="8" rx="4" fill="#fff"/><circle cx="86" cy="24" r="6" fill="#fff"/>',
+    newyear: HAT('M48 40 L60 6 L72 40 Z', '#5aa9ff') + '<circle cx="60" cy="6" r="4" fill="#f6c453"/><text x="98" y="22" font-size="20">🎉</text>',
+    party: HAT('M48 40 L60 6 L72 40 Z', '#ff6aa0') + '<circle cx="60" cy="6" r="4" fill="#f6c453"/>',
+    valentine: '<text x="22" y="34" font-size="18">💗</text><text x="100" y="26" font-size="14">💗</text>'
+  };
+  function costumeFor(d, birthday) {
+    const m = d.getMonth() + 1, day = d.getDate();
+    if (birthday) return 'party';
+    if ((m === 10 && day >= 15) || (m === 11 && day === 1)) return 'witch';
+    if (m === 12 && day <= 26) return 'santa';
+    if (m === 12 || (m === 1 && day <= 3)) return 'newyear';
+    if (m === 2 && day >= 7 && day <= 14) return 'valentine';
+    return '';
+  }
+
+  const ADJ = ['Sleepy', 'Sneaky', 'Giggling', 'Grumpy', 'Cozy', 'Wobbly', 'Moonlit', 'Sparkly', 'Mysterious', 'Fluffy', 'Dizzy', 'Brave'];
+  const NOUN = ['Teapot', 'Lantern', 'Biscuit', 'Sock', 'Umbrella', 'Toad', 'Kite', 'Teacup', 'Moth', 'Mushroom', 'Wheelbarrow', 'Owl'];
+  const conName = g => 'The ' + ADJ[Math.floor(rnd(g + 1, 91.7) * ADJ.length)] + ' ' + NOUN[Math.floor(rnd(g + 1, 17.3) * NOUN.length)];
+  let lastPos = [], hl = -1;
+
+  // tap a star: meet its constellation (every 6 stars make one)
+  $('cv').addEventListener('click', e => {
+    const r = $('cv').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, dist = 30;
+    lastPos.forEach(p => { const dd = Math.hypot(p.x - x, p.y - y); if (dd < dist) { dist = dd; best = p; } });
+    if (!best) return;
+    hl = Math.floor((best.s.n - 1) / 6);
+    const have = Math.min(6, state.events.length - hl * 6);
+    $('cname').textContent = '✨ ' + conName(hl) + (have < 6 ? ' (still forming: ' + have + ' of 6 stars)' : '');
+    drawSky();
+  });
+
+  // tap the mothman: a random trick, and a secret on the 7th quick tap
+  let taps = 0, tapT = 0, fxTimer = 0;
+  function poke() {
+    const t = Date.now();
+    taps = t - tapT < 4000 ? taps + 1 : 1; tapT = t;
+    const fx = taps >= 7 ? 'confetti' : ['spin', 'hide', 'sneeze'][Math.floor(Math.random() * 3)];
+    if (taps >= 7) taps = 0;
+    const g = $('tapfx');
+    g.setAttribute('class', ''); void g.getBoundingClientRect(); g.setAttribute('class', 'fx-' + fx);
+    $('fx').textContent = { spin: '💫', hide: '👀', sneeze: '💨', confetti: '🎉🌟🎉' }[fx];
+    $('cname').textContent = { spin: 'Wheee!', hide: 'Peekaboo!', sneeze: 'Achoo!', confetti: 'Secret! The mothman loves you both 💜' }[fx];
+    navigator.vibrate && navigator.vibrate(15);
+    clearTimeout(fxTimer);
+    fxTimer = setTimeout(() => { g.setAttribute('class', ''); $('fx').textContent = ''; }, 1400);
+  }
+  $('body').addEventListener('click', poke);
+  $('body').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); poke(); } });
 
   // ---- start ----
   show();
