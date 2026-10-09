@@ -3,7 +3,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#14132b">
-<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <title>Thinking of you</title>
 <style>
@@ -71,6 +70,7 @@
   @media (prefers-reduced-motion: reduce) { #body, #wings, #tapfx, .props text { animation: none !important; } }
 </style>
 <script src="firebase-config.js"></script>
+<script>document.head.insertAdjacentHTML("beforeend", '<link rel="manifest" href="manifest' + (self.GHOST.lang === "pt" ? "-pt" : "") + '.webmanifest">');</script>
 </head>
 <body>
 <section id="mood">
@@ -83,9 +83,9 @@
     <button data-m="chaos" style="--c:#ff6a4d"><span>🔥</span>Chaos</button>
   </div>
   <p id="msg" role="status"></p>
-  <button id="buzz" class="small" style="--c:#b9b4e6" hidden>Turn on buzzes</button>
-  <button id="install" class="small" style="--c:#b9b4e6" hidden>Add to home screen</button>
-  <a href="#sky">See our sky</a>
+  <button id="buzz" class="small" style="--c:#b9b4e6" data-t="buzz" hidden>Turn on buzzes</button>
+  <button id="install" class="small" style="--c:#b9b4e6" data-t="install" hidden>Add to home screen</button>
+  <a href="#sky" data-t="seeSky">See our sky</a>
 </section>
 <section id="sky">
   <div id="wrap">
@@ -127,16 +127,72 @@
       <text id="pet" x="14" y="140" font-size="26"></text>
     </svg>
   </div>
-  <div id="stats"><p id="cname"></p><p id="s1"></p><p id="s2"></p><p id="s3"></p><p id="s4"></p><div id="notes"></div><p><a href="#">Back</a></p></div>
+  <div id="stats"><p id="cname"></p><p id="s1"></p><p id="s2"></p><p id="s3"></p><p id="s4"></p><div id="notes"></div><p><a href="#" data-t="back">Back</a></p></div>
 </section>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
   import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
 
   const G = self.GHOST;
+  const LANG = G.lang === 'pt' ? 'pt' : 'en';
+  const PNOUN = [['Bule','m'],['Lanterna','f'],['Biscoito','m'],['Meia','f'],['Guarda-chuva','m'],['Sapo','m'],['Pipa','f'],['Xícara','f'],['Mariposa','f'],['Cogumelo','m'],['Carrinho de mão','m'],['Coruja','f']];
+  const PADJ = [['Sonolento','Sonolenta'],['Sorrateiro','Sorrateira'],['Risonho','Risonha'],['Rabugento','Rabugenta'],['Aconchegante','Aconchegante'],['Cambaleante','Cambaleante'],['Enluarado','Enluarada'],['Brilhante','Brilhante'],['Misterioso','Misteriosa'],['Fofinho','Fofinha'],['Tonto','Tonta'],['Valente','Valente']];
+  const TT = {
+    en: {
+      title: 'Thinking of you', hi: 'How does it feel today?', hiName: n => 'Hi ' + n + ', how does it feel today?',
+      link: 'Tap your charm to link this phone.', unknown: T.unknown,
+      offline: T.offline, sent: 'Sent ',
+      fail: T.fail,
+      buzzOn: T.buzzOn, buzzFail: T.buzzFail,
+      buzzOff: T.buzzOff,
+      buzz: 'Turn on buzzes', install: 'Add to home screen', seeSky: 'See our sky', back: 'Back',
+      ghostLabel: 'Our friendship mothman', tapLabel: 'Tap the mothman',
+      moods: { peace: 'Peace', missing: 'Missing you', happy: 'Happy', energy: 'Need energy', chaos: 'Chaos' },
+      now: 'just now', min: m => m + ' min ago',
+      hrs: h => h + (h === 1 ? ' hour' : ' hours') + ' ago', days: d => d + (d === 1 ? ' day' : ' days') + ' ago',
+      twin: ' ✨ Twin Star!', crown: ' 👑 100th thought: your mothman got a crown!', galaxy: ' 🌌 1000th thought: a new galaxy!',
+      seasons: ['Spring', 'Summer', 'Autumn', 'Winter'],
+      bday: names => '🎂 Birthday constellation for ' + names.join(' and '),
+      fday: y => '🌟 Friendship Day: ' + y + ' year' + (y > 1 ? 's' : '') + ' since your first tap',
+      twins: k => '✨ ' + k + ' twin stars in your sky',
+      season: 'Season: ', age: d => 'Mothman age: ' + d + ' days', together: y => ' · ' + y + ' year(s) together',
+      empty: 'No stars yet. Tap the charm to make the first one.',
+      thoughts: 'Thoughts shared: ', last: 'Last thought: ', waiting: ' · Mothman is curled up, waiting 💤',
+      hint: T.hint, forming: h => ' (still forming: ' + h + ' of 6 stars)',
+      con: g => 'The ' + ADJ[Math.floor(rnd(g + 1, 91.7) * ADJ.length)] + ' ' + NOUN[Math.floor(rnd(g + 1, 17.3) * NOUN.length)],
+      taps: { spin: 'Wheee!', hide: 'Peekaboo!', sneeze: 'Achoo!', confetti: 'Secret! The mothman loves you both 💜' }
+    },
+    pt: {
+      title: 'Pensando em você', hi: 'Como você está se sentindo hoje?', hiName: n => 'Oi, ' + n + '! Como você está se sentindo hoje?',
+      link: 'Aproxime seu amuleto do celular para conectá-lo.', unknown: 'Este amuleto não foi reconhecido.',
+      offline: 'Não foi possível falar com o servidor. Verifique sua conexão.', sent: 'Enviado ',
+      fail: 'Não foi possível enviar. Verifique sua conexão e tente de novo.',
+      buzzOn: 'Vibrações ativadas.', buzzFail: 'Não foi possível ativar as vibrações. Tente de novo.',
+      buzzOff: 'As vibrações estão desativadas. Você pode ativá-las nas configurações do celular.',
+      buzz: 'Ativar vibrações', install: 'Adicionar à tela inicial', seeSky: 'Ver nosso céu', back: 'Voltar',
+      ghostLabel: 'Nosso Homem-Mariposa da amizade', tapLabel: 'Toque no Homem-Mariposa',
+      moods: { peace: 'Paz', missing: 'Saudade', happy: 'Feliz', energy: 'Preciso de energia', chaos: 'Caos' },
+      now: 'agora mesmo', min: m => 'há ' + m + ' min',
+      hrs: h => 'há ' + h + (h === 1 ? ' hora' : ' horas'), days: d => 'há ' + d + (d === 1 ? ' dia' : ' dias'),
+      twin: ' ✨ Estrela Gêmea!', crown: ' 👑 100º pensamento: o Homem-Mariposa ganhou uma coroa!', galaxy: ' 🌌 1000º pensamento: uma nova galáxia!',
+      seasons: ['Primavera', 'Verão', 'Outono', 'Inverno'],
+      bday: names => '🎂 Constelação de aniversário de ' + names.join(' e '),
+      fday: y => '🌟 Dia da Amizade: ' + y + (y > 1 ? ' anos' : ' ano') + ' desde o primeiro toque',
+      twins: k => '✨ ' + k + (k === 1 ? ' estrela gêmea' : ' estrelas gêmeas') + ' no seu céu',
+      season: 'Estação: ', age: d => 'Idade do Homem-Mariposa: ' + d + (d === 1 ? ' dia' : ' dias'),
+      together: y => ' · ' + y + (y === 1 ? ' ano juntos' : ' anos juntos'),
+      empty: 'Ainda não há estrelas. Aproxime o amuleto para criar a primeira.',
+      thoughts: 'Pensamentos compartilhados: ', last: 'Último pensamento: ', waiting: ' · O Homem-Mariposa está encolhido, esperando 💤',
+      hint: 'Toque em uma estrela ou no Homem-Mariposa', forming: h => ' (ainda se formando: ' + h + ' de 6 estrelas)',
+      con: g => { const n = PNOUN[Math.floor(rnd(g + 1, 17.3) * PNOUN.length)], a = PADJ[Math.floor(rnd(g + 1, 91.7) * PADJ.length)], f = n[1] === 'f';
+                  return (f ? 'A ' : 'O ') + n[0] + ' ' + (f ? a[1] : a[0]); },
+      taps: { spin: 'Uhuu!', hide: 'Achou!', sneeze: 'Atchim!', confetti: 'Segredo! O Homem-Mariposa ama vocês dois 💜' }
+    }
+  };
+  const T = TT[LANG];
   const $ = id => document.getElementById(id);
   const COL = { peace: '#7bd389', missing: '#c9d3e6', happy: '#f6c453', energy: '#5aa9ff', chaos: '#ff6a4d' };
-  const NAME = { peace: 'Peace', missing: 'Missing you', happy: 'Happy', energy: 'Need energy', chaos: 'Chaos' };
+  const NAME = T.moods;
   const store = {
     get: k => { try { return localStorage.getItem(k); } catch { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch {} }
@@ -168,7 +224,7 @@
     return fetch(G.api + '?t=' + encodeURIComponent(token)).then(r => r.json()).then(s => {
       if (s.error) { $('hi').textContent = 'This charm is not recognised.'; return; }
       state = s;
-      $('hi').textContent = 'Hi ' + s.name + ', how does it feel today?';
+      $('hi').textContent = T.hiName(s.name);
       if (location.hash === '#sky') drawSky();
     }).catch(() => { $('msg').textContent = "Couldn't reach the server. Check your connection."; });
   }
@@ -180,7 +236,7 @@
       state.events.push({ n: state.events.length + 1, ts: Date.now(), sender: state.name, mood: b.dataset.m });
       b.classList.add('sent');
       navigator.vibrate && navigator.vibrate(30);
-      $('msg').textContent = 'Sent ' + b.firstChild.textContent + special();
+      $('msg').textContent = T.sent + b.firstChild.textContent + special();
       setTimeout(() => { b.classList.remove('sent'); moodButtons.forEach(x => (x.disabled = false)); }, 2500);
     }).catch(() => {
       $('msg').textContent = "That didn't send. Check your connection and try again.";
@@ -192,9 +248,9 @@
   async function registerDevice() {
     const reg = await navigator.serviceWorker.ready;
     const dt = await getToken(messaging, { vapidKey: G.vapidKey, serviceWorkerRegistration: reg });
-    if (dt && dt !== store.get('dt')) {
+    if (dt && dt !== store.get('dt:' + token)) {
       const j = await post({ t: token, action: 'register', device: dt });
-      if (j.ok) store.set('dt', dt);
+      if (j.ok) store.set('dt:' + token, dt);
     }
   }
   $('buzz').addEventListener('click', async () => {
@@ -213,17 +269,17 @@
 
   // ---- sky, ghost, seasons and hidden magic ----
   // [name, emoji, days needed, thoughts needed]. A season never goes back down.
-  const SEASONS = [['Spring', '🌱', 0, 0], ['Summer', '🌼', 30, 30], ['Autumn', '🍂', 180, 150], ['Winter', '❄️', 365, 400]];
+  const SEASONS = [[T.seasons[0], '🌱', 0, 0], [T.seasons[1], '🌼', 30, 30], [T.seasons[2], '🍂', 180, 150], [T.seasons[3], '❄️', 365, 400]];
   const PETS = ['', '🦋', '🐈', '🦉'];
   const fr = x => x - Math.floor(x);
   const rnd = (n, k) => fr(Math.sin(n * k) * 43758.5453);
   const mdOf = d => String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   function ago(ms) {
     const m = Math.round((Date.now() - ms) / 6e4);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + ' min ago';
+    if (m < 1) return T.now;
+    if (m < 60) return T.min(m);
     const h = Math.round(m / 60);
-    return h < 24 ? h + ' hours ago' : Math.round(h / 24) + ' days ago';
+    return h < 24 ? T.hrs(h) : T.days(Math.round(h / 24));
   }
   // Stars from different people sent within 10 minutes of each other
   function twinSet(ev) {
@@ -237,9 +293,9 @@
   function special() {
     const ev = state.events, n = ev.length, me = ev[n - 1];
     let s = '';
-    if (ev.some(e => e.sender !== me.sender && me.ts - e.ts <= 6e5)) s += ' ✨ Twin Star!';
-    if (n === 100) s += ' 👑 100th thought: your mothman got a crown!';
-    if (n === 1000) s += ' 🌌 1000th thought: a new galaxy!';
+    if (ev.some(e => e.sender !== me.sender && me.ts - e.ts <= 6e5)) s += T.twin;
+    if (n === 100) s += T.crown;
+    if (n === 1000) s += T.galaxy;
     return s;
   }
   function drawSky() {
@@ -328,18 +384,17 @@
 
     // text
     const notes = [];
-    if (bd.length) notes.push('🎂 Birthday constellation for ' + bd.join(' and '));
+    if (bd.length) notes.push(T.bday(bd));
     if (n) {
       const f = new Date(ev[0].ts), yrs = now.getFullYear() - f.getFullYear();
-      if (mdOf(f) === md && yrs > 0) notes.push('🌟 Friendship Day: ' + yrs + ' year' + (yrs > 1 ? 's' : '') + ' since your first tap');
+      if (mdOf(f) === md && yrs > 0) notes.push(T.fday(yrs));
     }
-    if (tw.size) notes.push('✨ ' + tw.size + ' twin stars in your sky');
+    if (tw.size) notes.push(T.twins(tw.size));
     if (!$('cname').textContent) $('cname').textContent = 'Tap a star, or tap the mothman';
-    $('s1').textContent = 'Season: ' + SEASONS[si][1] + ' ' + SEASONS[si][0];
-    $('s2').textContent = n ? 'Mothman age: ' + days + ' days' + (days >= 365 ? ' · ' + Math.floor(days / 365) + ' year(s) together' : '')
-                            : 'No stars yet. Tap the charm to make the first one.';
-    $('s3').textContent = n ? 'Thoughts shared: ' + n : '';
-    $('s4').textContent = n ? 'Last thought: ' + NAME[last.mood] + ' · ' + ago(last.ts) + (waiting ? ' · Mothman is curled up, waiting 💤' : '') : '';
+    $('s1').textContent = T.season + SEASONS[si][1] + ' ' + SEASONS[si][0];
+    $('s2').textContent = n ? T.age(days) + (days >= 365 ? T.together(Math.floor(days / 365)) : '') : T.empty;
+    $('s3').textContent = n ? T.thoughts + n : '';
+    $('s4').textContent = n ? T.last + NAME[last.mood] + ' · ' + ago(last.ts) + (waiting ? T.waiting : '') : '';
     $('notes').replaceChildren(...notes.map(t => { const p = document.createElement('p'); p.textContent = t; return p; }));
   }
 
@@ -365,7 +420,7 @@
 
   const ADJ = ['Sleepy', 'Sneaky', 'Giggling', 'Grumpy', 'Cozy', 'Wobbly', 'Moonlit', 'Sparkly', 'Mysterious', 'Fluffy', 'Dizzy', 'Brave'];
   const NOUN = ['Teapot', 'Lantern', 'Biscuit', 'Sock', 'Umbrella', 'Toad', 'Kite', 'Teacup', 'Moth', 'Mushroom', 'Wheelbarrow', 'Owl'];
-  const conName = g => 'The ' + ADJ[Math.floor(rnd(g + 1, 91.7) * ADJ.length)] + ' ' + NOUN[Math.floor(rnd(g + 1, 17.3) * NOUN.length)];
+  const conName = g => T.con(g);
   let lastPos = [], hl = -1;
 
   // tap a star: meet its constellation (every 6 stars make one)
@@ -376,7 +431,7 @@
     if (!best) return;
     hl = Math.floor((best.s.n - 1) / 6);
     const have = Math.min(6, state.events.length - hl * 6);
-    $('cname').textContent = '✨ ' + conName(hl) + (have < 6 ? ' (still forming: ' + have + ' of 6 stars)' : '');
+    $('cname').textContent = '✨ ' + conName(hl) + (have < 6 ? T.forming(have) : '');
     drawSky();
   });
 
@@ -390,7 +445,7 @@
     const g = $('tapfx');
     g.setAttribute('class', ''); void g.getBoundingClientRect(); g.setAttribute('class', 'fx-' + fx);
     $('fx').textContent = { spin: '💫', hide: '👀', sneeze: '💨', confetti: '🎉🌟🎉' }[fx];
-    $('cname').textContent = { spin: 'Wheee!', hide: 'Peekaboo!', sneeze: 'Achoo!', confetti: 'Secret! The mothman loves you both 💜' }[fx];
+    $('cname').textContent = T.taps[fx];
     navigator.vibrate && navigator.vibrate(15);
     clearTimeout(fxTimer);
     fxTimer = setTimeout(() => { g.setAttribute('class', ''); $('fx').textContent = ''; }, 1400);
@@ -399,11 +454,18 @@
   $('body').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); poke(); } });
 
   // ---- start ----
+  document.documentElement.lang = LANG === 'pt' ? 'pt-BR' : 'en';
+  document.title = T.title;
+  document.querySelectorAll('[data-t]').forEach(el => (el.textContent = T[el.dataset.t]));
+  moodButtons.forEach(b => (b.lastChild.textContent = T.moods[b.dataset.m]));
+  $('ghost').setAttribute('aria-label', T.ghostLabel);
+  $('body').setAttribute('aria-label', T.tapLabel);
+  $('hi').textContent = T.hi;
   show();
   (async () => {
     if ('serviceWorker' in navigator) await navigator.serviceWorker.register('sw.js');
     if (!token) {
-      $('hi').textContent = 'Tap your charm to link this phone.';
+      $('hi').textContent = T.link;
       moodButtons.forEach(b => (b.disabled = true));
       return;
     }
