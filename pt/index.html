@@ -140,11 +140,11 @@
   const TT = {
     en: {
       title: 'Thinking of you', hi: 'How does it feel today?', hiName: n => 'Hi ' + n + ', how does it feel today?',
-      link: 'Tap your charm to link this phone.', unknown: T.unknown,
-      offline: T.offline, sent: 'Sent ',
-      fail: T.fail,
-      buzzOn: T.buzzOn, buzzFail: T.buzzFail,
-      buzzOff: T.buzzOff,
+      link: 'Tap your charm to link this phone.', unknown: 'This charm is not recognised.',
+      offline: "Couldn't reach the server. Check your connection.", sent: 'Sent ',
+      fail: "That didn't send. Check your connection and try again.",
+      buzzOn: 'Buzzes are on.', buzzFail: "Couldn't turn on buzzes. Please try again.",
+      buzzOff: 'Buzzes are off. You can turn them on in your phone settings.',
       buzz: 'Turn on buzzes', install: 'Add to home screen', seeSky: 'See our sky', back: 'Back',
       ghostLabel: 'Our friendship mothman', tapLabel: 'Tap the mothman',
       moods: { peace: 'Peace', missing: 'Missing you', happy: 'Happy', energy: 'Need energy', chaos: 'Chaos' },
@@ -158,7 +158,7 @@
       season: 'Season: ', age: d => 'Mothman age: ' + d + ' days', together: y => ' · ' + y + ' year(s) together',
       empty: 'No stars yet. Tap the charm to make the first one.',
       thoughts: 'Thoughts shared: ', last: 'Last thought: ', waiting: ' · Mothman is curled up, waiting 💤',
-      hint: T.hint, forming: h => ' (still forming: ' + h + ' of 6 stars)',
+      hint: 'Tap a star, or tap the mothman', forming: h => ' (still forming: ' + h + ' of 6 stars)',
       con: g => 'The ' + ADJ[Math.floor(rnd(g + 1, 91.7) * ADJ.length)] + ' ' + NOUN[Math.floor(rnd(g + 1, 17.3) * NOUN.length)],
       taps: { spin: 'Wheee!', hide: 'Peekaboo!', sneeze: 'Achoo!', confetti: 'Secret! The mothman loves you both 💜' }
     },
@@ -222,11 +222,11 @@
 
   function loadState() {
     return fetch(G.api + '?t=' + encodeURIComponent(token)).then(r => r.json()).then(s => {
-      if (s.error) { $('hi').textContent = 'This charm is not recognised.'; return; }
+      if (s.error) { $('hi').textContent = T.unknown; return; }
       state = s;
       $('hi').textContent = T.hiName(s.name);
       if (location.hash === '#sky') drawSky();
-    }).catch(() => { $('msg').textContent = "Couldn't reach the server. Check your connection."; });
+    }).catch(() => { $('msg').textContent = T.offline; });
   }
 
   moodButtons.forEach(b => b.addEventListener('click', () => {
@@ -239,7 +239,7 @@
       $('msg').textContent = T.sent + b.firstChild.textContent + special();
       setTimeout(() => { b.classList.remove('sent'); moodButtons.forEach(x => (x.disabled = false)); }, 2500);
     }).catch(() => {
-      $('msg').textContent = "That didn't send. Check your connection and try again.";
+      $('msg').textContent = T.fail;
       moodButtons.forEach(x => (x.disabled = false));
     });
   }));
@@ -256,10 +256,10 @@
   $('buzz').addEventListener('click', async () => {
     const perm = await Notification.requestPermission();
     if (perm === 'granted') {
-      try { await registerDevice(); $('buzz').hidden = true; $('msg').textContent = 'Buzzes are on.'; }
-      catch { $('msg').textContent = "Couldn't turn on buzzes. Please try again."; }
+      try { await registerDevice(); $('buzz').hidden = true; $('msg').textContent = T.buzzOn; }
+      catch { $('msg').textContent = T.buzzFail; }
     } else {
-      $('msg').textContent = 'Buzzes are off. You can turn them on in your phone settings.';
+      $('msg').textContent = T.buzzOff;
     }
   });
 
@@ -390,7 +390,7 @@
       if (mdOf(f) === md && yrs > 0) notes.push(T.fday(yrs));
     }
     if (tw.size) notes.push(T.twins(tw.size));
-    if (!$('cname').textContent) $('cname').textContent = 'Tap a star, or tap the mothman';
+    if (!$('cname').textContent) $('cname').textContent = T.hint;
     $('s1').textContent = T.season + SEASONS[si][1] + ' ' + SEASONS[si][0];
     $('s2').textContent = n ? T.age(days) + (days >= 365 ? T.together(Math.floor(days / 365)) : '') : T.empty;
     $('s3').textContent = n ? T.thoughts + n : '';
