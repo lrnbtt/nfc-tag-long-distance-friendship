@@ -8,7 +8,7 @@ const messaging = firebase.messaging();
 // A buzz arrives while the app is closed: show it with a short heartbeat vibration.
 messaging.onBackgroundMessage(p => {
   const d = p.data || {};
-  return self.registration.showNotification(d.title || 'Thinking of you', {
+  return self.registration.showNotification(d.title || (self.GHOST.lang === 'pt' ? 'Pensando em você' : 'Thinking of you'), {
     body: d.body || '',
     icon: 'icon-192.png',
     badge: 'icon-192.png',
@@ -19,9 +19,9 @@ messaging.onBackgroundMessage(p => {
 });
 
 // Keeps the app opening quickly and offline-friendly.
-const C = 'ghost-v2';
+const C = 'ghost-v3';
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(C).then(c => c.addAll(['./', './index.html', './manifest.webmanifest', './firebase-config.js', './icon-192.png', './icon-512.png'])));
+  e.waitUntil(caches.open(C).then(c => c.addAll(['./', './index.html', './manifest.webmanifest', './manifest-pt.webmanifest', './firebase-config.js', './icon-192.png', './icon-512.png'])));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
