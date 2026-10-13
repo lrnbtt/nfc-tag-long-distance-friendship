@@ -68,6 +68,8 @@
   #notes p { color: #f6c453; }
   #cname { color: #f6c453; min-height: 1.6em; }
   @media (prefers-reduced-motion: reduce) { #body, #wings, #tapfx, .props text { animation: none !important; } }
+  button:disabled { opacity: .5; cursor: default; }
+  button.sent:disabled { opacity: 1; }
 </style>
 <script src="firebase-config.js"></script>
 <script>document.head.insertAdjacentHTML("beforeend", '<link rel="manifest" href="manifest' + (self.GHOST.lang === "pt" ? "-pt" : "") + '.webmanifest">');</script>
@@ -143,7 +145,7 @@
       link: 'Tap your charm to link this phone.', unknown: 'This charm is not recognised.',
       offline: "Couldn't reach the server. Check your connection.", sent: 'Sent ',
       fail: "That didn't send. Check your connection and try again.",
-      buzzOn: 'Buzzes are on.', buzzFail: "Couldn't turn on buzzes. Please try again.",
+      already: "You've already sent today's thought 💜 Come back tomorrow.", buzzOn: 'Buzzes are on.', buzzFail: "Couldn't turn on buzzes. Please try again.",
       buzzOff: 'Buzzes are off. You can turn them on in your phone settings.',
       buzz: 'Turn on buzzes', install: 'Add to home screen', seeSky: 'See our sky', back: 'Back',
       ghostLabel: 'Our friendship mothman', tapLabel: 'Tap the mothman',
@@ -167,7 +169,7 @@
       link: 'Aproxime seu amuleto do celular para conectá-lo.', unknown: 'Este amuleto não foi reconhecido.',
       offline: 'Não foi possível falar com o servidor. Verifique sua conexão.', sent: 'Enviado ',
       fail: 'Não foi possível enviar. Verifique sua conexão e tente de novo.',
-      buzzOn: 'Vibrações ativadas.', buzzFail: 'Não foi possível ativar as vibrações. Tente de novo.',
+      already: 'Você já enviou o pensamento de hoje 💜 Volte amanhã.', buzzOn: 'Vibrações ativadas.', buzzFail: 'Não foi possível ativar as vibrações. Tente de novo.',
       buzzOff: 'As vibrações estão desativadas. Você pode ativá-las nas configurações do celular.',
       buzz: 'Ativar vibrações', install: 'Adicionar à tela inicial', seeSky: 'Ver nosso céu', back: 'Voltar',
       ghostLabel: 'Nosso Homem-Mariposa da amizade', tapLabel: 'Toque no Homem-Mariposa',
@@ -220,10 +222,21 @@
 
   const moodButtons = [...document.querySelectorAll('#moods button')];
 
+  // One thought per day: lock the moods once today's has been sent
+  function applyLimit() {
+    moodButtons.forEach(b => {
+      b.disabled = !!state.sentToday;
+      b.classList.toggle('sent', !!state.sentToday && b.dataset.m === state.sentMood);
+    });
+    if (state.sentToday && !$('msg').textContent) $('msg').textContent = T.already;
+    else if (!state.sentToday && $('msg').textContent === T.already) $('msg').textContent = '';
+  }
+
   function loadState() {
     return fetch(G.api + '?t=' + encodeURIComponent(token)).then(r => r.json()).then(s => {
       if (s.error) { $('hi').textContent = T.unknown; return; }
       state = s;
+      applyLimit();
       $('hi').textContent = T.hiName(s.name);
       if (location.hash === '#sky') drawSky();
     }).catch(() => { $('msg').textContent = T.offline; });
@@ -232,15 +245,16 @@
   moodButtons.forEach(b => b.addEventListener('click', () => {
     moodButtons.forEach(x => (x.disabled = true));
     post({ t: token, mood: b.dataset.m }).then(j => {
+      if (j.limit) { state.sentToday = true; applyLimit(); $('msg').textContent = T.already; return; }
       if (!j.ok) throw 0;
       state.events.push({ n: state.events.length + 1, ts: Date.now(), sender: state.name, mood: b.dataset.m });
       b.classList.add('sent');
       navigator.vibrate && navigator.vibrate(30);
       $('msg').textContent = T.sent + b.firstChild.textContent + special();
-      setTimeout(() => { b.classList.remove('sent'); moodButtons.forEach(x => (x.disabled = false)); }, 2500);
+      state.sentToday = true; state.sentMood = b.dataset.m; applyLimit();
     }).catch(() => {
       $('msg').textContent = T.fail;
-      moodButtons.forEach(x => (x.disabled = false));
+      applyLimit();
     });
   }));
 
@@ -470,6 +484,7 @@
       return;
     }
     loadState();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadState(); });
     try {
       if (!(await isSupported())) return;
       messaging = getMessaging(initializeApp(G.firebase));
