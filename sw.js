@@ -13,13 +13,13 @@ messaging.onBackgroundMessage(p => {
     icon: 'icon-192.png',
     badge: 'icon-192.png',
     vibrate: [80, 60, 140],
-    tag: 'thought',
+    tag: d.kind === 'remind' ? 'remind' : 'thought',
     renotify: true
   });
 });
 
 // Keeps the app opening quickly and offline-friendly.
-const C = 'ghost-v3';
+const C = 'ghost-v4';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(['./', './index.html', './manifest.webmanifest', './manifest-pt.webmanifest', './firebase-config.js', './icon-192.png', './icon-512.png'])));
   self.skipWaiting();
@@ -32,4 +32,13 @@ self.addEventListener('fetch', e => {
       .then(r => { const cp = r.clone(); caches.open(C).then(c => c.put(e.request, cp)); return r; })
       .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
+});
+
+// Tapping a notification opens (or returns to) the app.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) if ('focus' in c) return c.focus();
+    return clients.openWindow('./');
+  }));
 });
