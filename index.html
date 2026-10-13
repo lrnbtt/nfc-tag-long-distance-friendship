@@ -357,7 +357,8 @@
     }
     // the constellation you tapped glows gold
     if (hl >= 0) {
-      ctx.strokeStyle = 'rgba(246,196,83,.85)'; ctx.lineWidth = 2; ctx.beginPath();
+     // ctx.strokeStyle = 'rgba(246,196,83,.85)'; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.strokeStyle = 'rgba(173, 216, 230, 1)'; ctx.lineWidth = 2; ctx.beginPath(); 
       pos.slice(hl * 6, hl * 6 + 6).forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
       ctx.stroke();
     }
