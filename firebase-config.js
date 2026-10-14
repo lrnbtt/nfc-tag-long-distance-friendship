@@ -1,7 +1,7 @@
 // The only file you edit on GitHub. Used by both the page and the service worker.
 self.GHOST = {
   lang: 'en',   // 'en' for English, 'pt' for Brazilian Portuguese
-  api: 'https://script.google.com/macros/s/AKfycbwwZ9M1I-svWkHzZRmCJQlFpoiWreCs9R1OFwLOkPgBuT5sFb_n7IcJ6k43D5kDRnBI/exec',
+  api: 'https://script.google.com/macros/s/AKfycbwb90MMv8nOnpppcpmEqCS3NE9_EokCjMxBGlKMxOqC5xRDWkE7OeB0qUBl69aGhEb0/exec',
   vapidKey: 'BOO12LDI6JyBAuCSMXKS718oUu6-RRnqo70kJ8Wi6nwjsUnFS6XHerORrAPJrPeeiiQ2VB5bvkdT2wl9A3j-XBw',
   firebase: {
   apiKey: "AIzaSyA5_7UGXw42jZklnKeH4eS8McpI9AX30vE",
